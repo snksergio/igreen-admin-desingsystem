@@ -117,11 +117,31 @@
      deploy: não regenera, porque o `vercel.json` usa `buildCommand: "next build"`, que
      não dispara lifecycle npm. Documentado em `DISTRIBUICAO.md` §3.
 
-- Achado colateral, **não corrigido** (é estado local, não do repo): o `public/r` desta
-  máquina tem **86** itens e o `registry.json` tem 87 — falta exatamente o
-  **`choropleth-map`**. Quem rodar `copy-registry.mjs` sem `registry:build` antes
-  regenera o embed **sem** ele: a L-058 se repetindo. O check pega (`exit 1`,
-  comprovado). Some ao rodar `registry:build`, que é passo 1 do `/ds-release`.
+- **6. O `copy-registry.mjs` passou a se recusar a escrever embed regredido** — pedido do
+  mantenedor pra "fechar o choropleth-map sem quebrar as coisas". Investigado antes de
+  mexer: **nada estava quebrado no repo.** O `choropleth-map` está completo no embed
+  commitado (5 arquivos, 19.031 bytes, stamp e deps corretos), no `registry.json`, no
+  catálogo do CLI. O problema era só o `public/r` **local** (gitignored).
+  E era pior do que a medição inicial sugeria: o `public/r` desta máquina era de
+  **v0.29.0** (`48354fd · 2026-07-09`), não só faltando 1 item. Regenerar o embed dele
+  teria (a) revertido 86 itens pra v0.29.0, (b) **re-injetado os headers `@igreen-stamp`
+  que a v0.30.0 removeu de propósito** (todos os 5 arquivos do Button divergiam, os do
+  disco maiores exatamente por isso), e (c) dropado o `choropleth-map`. Silenciosamente.
+  **Descartado** rodar `registry:build` como "conserto": o `registry:stamp` re-carimbaria
+  os 87 itens com hash e data de hoje, produzindo um stamp `v0.30.0` cujo hash **não é** o
+  commit da v0.30.0. O fix foi na fonte — o script compara, **antes de escrever**, o
+  conjunto de itens e a versão do carimbo contra o `registry.json`; divergência →
+  `exit 1` sem tocar no embed. Verificado nos dois caminhos com dados reais: recusou o
+  estado v0.29.0 (apontando os 2 problemas) e liberou depois que o `public/r` foi
+  reconstruído a partir do próprio embed — e o **round-trip saiu byte-idêntico**, o que
+  prova de lambuja que o embed é reproduzível. `public/r` local agora com os 87 itens em
+  v0.30.0, sem churn de stamp.
+  **Sem teste unitário, por decisão:** o guard é auto-contido em
+  `registry-app/scripts/copy-registry.mjs` de propósito — importar de `scripts/lib/` seria
+  um import cross-package que quebraria se a Vercel algum dia rodasse o `prebuild` (o root
+  dir dela é `registry-app/`). Verificação foi end-to-end nos dois caminhos com o estado
+  real, mais forte que fixture sintética; e o `registry-check` (12 testes) é a segunda
+  camada, que pega a mesma classe depois do fato.
 
 - Assumption: comparar `meta.stamp` é suficiente pra detectar embed defasado. **Se
   quebrar:** alguém regenera o embed E o `registry.json` juntos a partir de uma fonte

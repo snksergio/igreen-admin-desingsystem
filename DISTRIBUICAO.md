@@ -111,6 +111,17 @@ quando `../public/r` não existe (é gitignored e fica fora do root dir da Verce
 design, mantendo o embed commitado. **Conclusão: a Vercel serve exatamente o
 `registry-data.ts` que está commitado.** Regenerar é passo humano do `/ds-release`.
 
+> **`public/r` velho REGRIDE o consumidor — o `copy-registry.mjs` agora se recusa.**
+> `public/r` é gitignored e o script **não** o regenera; é só a saída do `registry:build`.
+> Gerar o embed de um `public/r` de release anterior reverte o que o consumidor recebe, em
+> silêncio. Caso real (2026-07-29): o `public/r` da máquina do mantenedor era de **v0.29.0**
+> com o embed em v0.30.0 — regenerar teria revertido 86 itens, **re-injetado os headers
+> `@igreen-stamp` que a v0.30.0 removeu de propósito**, e dropado o `choropleth-map`, que
+> não existia no registry naquela release (a L-058 se repetindo, no mesmo componente).
+> O script passou a comparar, **antes de escrever**, o conjunto de itens e a versão do
+> carimbo contra o `registry.json`; divergência → `exit 1` sem tocar no embed. Sempre rode
+> `npm run registry:build` antes.
+
 **2. `registry-check` valida o embed por CARIMBO, não por nome.** Até 2026-07-29 ele só
 checava se o embed continha o *nome* dos itens — e nome não muda entre releases, então era
 verde-permanente com o conteúdo arbitrariamente velho. O cenário que passava batido: bump
